@@ -26,7 +26,7 @@ class InternalServicesClient(ServicesClient):
         self.conversations: dict[str, InternalConversation] = {}
         self.contexts: dict[str, dict[str, str | None]] = {}
 
-    async def new_conversation(self, user_id: str, is_resumed: bool) -> Conversation:
+    def new_conversation(self, user_id: str, is_resumed: bool) -> Conversation:
         message_list: list[UserMessage | AgentMessage] = []
         user_context: dict[str, ContextItem] = {}
         conversation = InternalConversation(
@@ -47,7 +47,7 @@ class InternalServicesClient(ServicesClient):
         print(f"New conversation id created: {conversation.conversation_id}")
         return conversation
 
-    async def get_conversation(self, user_id: str, session_id: str) -> Conversation:
+    def get_conversation(self, user_id: str, session_id: str) -> Conversation:
         message_list: list[UserMessage | AgentMessage] = []
         user_context: dict[str, ContextItem] = {}
         conversation = Conversation(
@@ -62,7 +62,7 @@ class InternalServicesClient(ServicesClient):
         conversation.history = message_list
         return conversation
 
-    async def add_conversation_message(
+    def add_conversation_message(
         self,
         conversation_id: str,
         message_type: MessageType,
@@ -76,10 +76,10 @@ class InternalServicesClient(ServicesClient):
         else:
             raise Exception("Failed to add conversation message")
 
-    async def verify_ticket(self, ticket: str, ip_address: str) -> VerifyTicketResponse:
+    def verify_ticket(self, ticket: str, ip_address: str) -> VerifyTicketResponse:
         return VerifyTicketResponse(is_valid=True, user_id="default")
 
-    async def add_context_item(
+    def add_context_item(
         self, user_id: str, item_key: str, item_value: str | None
     ) -> GeneralResponse:
         if user_id not in self.contexts:
@@ -87,7 +87,7 @@ class InternalServicesClient(ServicesClient):
         self.contexts[user_id][item_key] = item_value
         return ItemAddedResponse()
 
-    async def update_context_item(
+    def update_context_item(
         self, user_id: str, item_key: str, item_value: str | None
     ) -> GeneralResponse:
         if user_id not in self.contexts:
@@ -97,7 +97,7 @@ class InternalServicesClient(ServicesClient):
         self.contexts[user_id][item_key] = item_value
         return ItemUpdatedResponse()
 
-    async def delete_context_item(self, user_id: str, item_key: str) -> GeneralResponse:
+    def delete_context_item(self, user_id: str, item_key: str) -> GeneralResponse:
         if user_id not in self.contexts:
             return UserNotFoundResponse()
         if item_key not in self.contexts[user_id]:
@@ -105,7 +105,7 @@ class InternalServicesClient(ServicesClient):
         del self.contexts[user_id][item_key]
         return ItemDeleteResponse()
 
-    async def get_context_items(self, user_id: str) -> dict[str, str | None]:
+    def get_context_items(self, user_id: str) -> dict[str, str | None]:
         if user_id not in self.contexts:
             return {}
         return self.contexts[user_id]

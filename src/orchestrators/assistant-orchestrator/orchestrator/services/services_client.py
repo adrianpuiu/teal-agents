@@ -58,15 +58,15 @@ class VerifyTicketResponse(BaseModel):
 
 class ServicesClient(ABC):
     @abstractmethod
-    async def new_conversation(self, user_id: str, is_resumed: bool) -> Conversation:
+    def new_conversation(self, user_id: str, is_resumed: bool) -> Conversation:
         pass
 
     @abstractmethod
-    async def get_conversation(self, user_id: str, session_id: str) -> Conversation:
+    def get_conversation(self, user_id: str, session_id: str) -> Conversation:
         pass
 
     @abstractmethod
-    async def add_conversation_message(
+    def add_conversation_message(
         self,
         conversation_id: str,
         message_type: MessageType,
@@ -76,25 +76,25 @@ class ServicesClient(ABC):
         pass
 
     @abstractmethod
-    async def verify_ticket(self, ticket: str, ip_address: str) -> VerifyTicketResponse:
+    def verify_ticket(self, ticket: str, ip_address: str) -> VerifyTicketResponse:
         pass
 
     @abstractmethod
-    async def add_context_item(
+    def add_context_item(
         self, user_id: str, item_key: str, item_value: str | None
     ) -> GeneralResponse:
         pass
 
     @abstractmethod
-    async def update_context_item(
+    def update_context_item(
         self, user_id: str, item_key: str, item_value: str | None
     ) -> GeneralResponse:
         pass
 
     @abstractmethod
-    async def delete_context_item(self, user_id: str, item_key: str) -> GeneralResponse:
+    def delete_context_item(self, user_id: str, item_key: str) -> GeneralResponse:
         pass
 
     @abstractmethod
-    async def get_context_items(self, user_id: str) -> dict[str, str | None]:
+    def get_context_items(self, user_id: str) -> dict[str, str | None]:
         pass
