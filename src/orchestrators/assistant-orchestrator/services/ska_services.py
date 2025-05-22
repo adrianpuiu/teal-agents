@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from pynamodb.exceptions import DeleteError, DoesNotExist
 from ska_utils import AppConfig, get_telemetry, initialize_telemetry, strtobool
 
@@ -79,12 +80,12 @@ ticket_manager: TicketManager = get_ticket_manager()
 context_manager: ContextManager = get_context_manager()
 
 auth_helper: CustomAuthHelper = CustomAuthHelper(app_config)
-authenticator: Authenticator[auth_helper.get_request_type()] = auth_helper.get_authenticator()
+authenticator: Authenticator[type[BaseModel]] = auth_helper.get_authenticator()
 
 
 @app.post("/services/v1/{orchestrator_name}/authenticate")
 async def authenticate_user(
-    orchestrator_name: str, payload: auth_helper.get_request_type()
+    orchestrator_name: str, payload: type[BaseModel]
 ) -> AuthenticationResponse:
     auth_response = authenticator.authenticate(orchestrator_name, payload)
     if auth_response.success:
@@ -97,7 +98,7 @@ async def authenticate_user(
 
 @app.post("/services/v1/{orchestrator_name}/tickets", tags=["Tickets"])
 async def create_ticket(
-    orchestrator_name: str, payload: auth_helper.get_request_type(), request: Request
+    orchestrator_name: str, payload: type[BaseModel], request: Request
 ) -> CreateTicketResponse:
     ip_address: str
     if strtobool(str(app_config.get(TA_KONG_ENABLED.env_name))):
