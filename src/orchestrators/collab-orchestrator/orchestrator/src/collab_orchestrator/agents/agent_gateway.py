@@ -45,20 +45,25 @@ class AgentGateway(BaseModel):
         max_retries = 3
         attempt = 0
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            while attempt < max_retries:
-                try:
+        while attempt < max_retries:
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    logging.info(f"Invoking agent {agent_name} version {agent_version}")
                     response = await client.post(
                         self._get_endpoint_for_agent(agent_name, agent_version),
                         content=payload,
                         headers=headers,
                     )
+                    logging.info(
+                        f"Response from agent {agent_name} version {agent_version}"
+                    )
                     response.raise_for_status()
                     return response.json()
-                except Exception as e:
-                    logging.warn(f"Error invoking agent {agent_name}: {e}")
-                    attempt += 1
-            raise TimeoutError()
+            except Exception as e:
+                print(e)
+                logging.warn(f"Error invoking agent {agent_name}: {e}")
+                attempt += 1
+        raise TimeoutError()
 
     async def invoke_agent_sse(
         self, agent_name: str, agent_version: str, agent_input: BaseModel

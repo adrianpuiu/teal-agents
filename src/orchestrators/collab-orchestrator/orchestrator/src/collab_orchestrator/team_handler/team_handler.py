@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections.abc import AsyncIterable
 from contextlib import nullcontext
@@ -58,6 +59,7 @@ class TeamHandler(KindHandler):
         request_id: str | None = None,
     ) -> AsyncIterable[str]:
         """Executes a single task and streams results."""
+        logging.info(f"Executing task for agent {agent_name}")
         try:
             async for result in self.task_executor.execute_task_sse(
                 task_id=task_id,
@@ -70,6 +72,8 @@ class TeamHandler(KindHandler):
             ):
                 yield result
         except Exception as e:
+            print(e)
+            logging.error(str(e))
             yield new_event_response(
                 EventType.ERROR,
                 ErrorResponse(
@@ -115,11 +119,13 @@ class TeamHandler(KindHandler):
             round_no = 0
             conversation = Conversation(messages=[])
             while True:
+                logging.info("Begin of round %d", round_no)
                 with (
                     self.t.tracer.start_as_current_span(name="determine-next-action")
                     if self.t.telemetry_enabled()
                     else nullcontext()
                 ):
+                    logging.info("Invoking manager agent to determine next action")
                     try:
                         manager_output = await self.manager_agent.determine_next_action(
                             chat_history,
@@ -127,7 +133,10 @@ class TeamHandler(KindHandler):
                             self.task_agents_bases,
                             conversation.messages,
                         )
+                        logging.info("Manager call completed successfully")
                     except Exception as e:
+                        print(e)
+                        logging.error(str(e))
                         yield new_event_response(
                             EventType.ERROR,
                             ErrorResponse(
@@ -144,6 +153,7 @@ class TeamHandler(KindHandler):
                     manager_output.request_id = request_id
                     yield new_event_response(EventType.MANAGER_RESPONSE, manager_output)
 
+                    logging.info(f"Next Action: {manager_output.next_action}")
                     match manager_output.next_action:
                         case Action.PROVIDE_RESULT:
                             yield new_event_response(
@@ -199,6 +209,7 @@ class TeamHandler(KindHandler):
                             break
                     round_no = round_no + 1
                     if round_no >= self.max_rounds:
+                        logging.error("Max number of rounds reached")
                         yield new_event_response(
                             EventType.ERROR,
                             AbortResult(

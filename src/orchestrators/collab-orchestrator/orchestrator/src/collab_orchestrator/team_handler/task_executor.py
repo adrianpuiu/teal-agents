@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterable
 from contextlib import nullcontext
 
@@ -89,6 +90,8 @@ class TaskExecutor:
                 #             ),
                 #         )
             except Exception as e:
+                print(e)
+                logging.error(str(e))
                 yield new_event_response(
                     EventType.ERROR,
                     ErrorResponse(
