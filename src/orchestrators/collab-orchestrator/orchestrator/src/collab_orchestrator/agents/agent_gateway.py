@@ -1,7 +1,8 @@
+import asyncio
+import logging
 from collections.abc import AsyncIterable
 from typing import Any
 
-import aiohttp
 import httpx
 import websockets
 from httpx_sse import ServerSentEvent, aconnect_sse
@@ -30,7 +31,6 @@ class AgentGateway(BaseModel):
 
     async def invoke_agent(
         self,
-        session: aiohttp.ClientSession,
         agent_name: str,
         agent_version: str,
         agent_input: BaseModel,
@@ -42,13 +42,23 @@ class AgentGateway(BaseModel):
             "Content-Type": "application/json",
         }
         inject(headers)
-        async with session.post(
-            self._get_endpoint_for_agent(agent_name, agent_version),
-            data=payload,
-            headers=headers,
-        ) as response:
-            response.raise_for_status()
-            return await response.json()
+        max_retries = 3
+        attempt = 0
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            while attempt < max_retries:
+                try:
+                    response = await client.post(
+                        self._get_endpoint_for_agent(agent_name, agent_version),
+                        content=payload,
+                        headers=headers,
+                    )
+                    response.raise_for_status()
+                    return response.json()
+                except Exception as e:
+                    logging.warn(f"Error invoking agent {agent_name}: {e}")
+                    attempt += 1
+            raise TimeoutError()
 
     async def invoke_agent_sse(
         self, agent_name: str, agent_version: str, agent_input: BaseModel

@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterable
 from contextlib import nullcontext
 
+import aiohttp
 from httpx_sse import ServerSentEvent
 from ska_utils import get_telemetry
 
@@ -18,7 +19,7 @@ from collab_orchestrator.team_handler.conversation import Conversation
 
 class TaskExecutor:
     def __init__(self, agents: list[TaskAgent]):
-        self.agents = {}
+        self.agents: dict[str, TaskAgent] = {}
         for agent in agents:
             self.agents[f"{agent.agent.name}:{agent.agent.version}"] = agent
         self.t = get_telemetry()
@@ -60,27 +61,33 @@ class TaskExecutor:
             task_result = ""
             pre_reqs = conversation.to_pre_requisites()
             try:
-                async for content in task_agent.perform_task_sse(
+                response = await task_agent.perform_task(
                     session_id, instructions, pre_reqs
-                ):
-                    if isinstance(content, PartialResponse):
-                        yield new_event_response(EventType.PARTIAL_RESPONSE, content)
-                    elif isinstance(content, InvokeResponse):
-                        task_result = content.output_raw
-                        yield new_event_response(EventType.FINAL_RESPONSE, content)
-                    elif isinstance(content, ServerSentEvent):
-                        yield f"event: {content.event}\ndata: {content.data}\n\n"
-                    else:
-                        yield new_event_response(
-                            EventType.ERROR,
-                            ErrorResponse(
-                                session_id=session_id,
-                                source=source,
-                                request_id=request_id,
-                                status_code=500,
-                                detail=f"Unknown response type - {str(content)}",
-                            ),
-                        )
+                )
+                i_response = InvokeResponse.model_validate(response)
+                task_result = i_response.output_raw
+                yield new_event_response(EventType.FINAL_RESPONSE, i_response)
+                # async for content in task_agent.perform_task_sse(
+                #     session_id, instructions, pre_reqs
+                # ):
+                #     if isinstance(content, PartialResponse):
+                #         yield new_event_response(EventType.PARTIAL_RESPONSE, content)
+                #     elif isinstance(content, InvokeResponse):
+                #         task_result = content.output_raw
+                #         yield new_event_response(EventType.FINAL_RESPONSE, content)
+                #     elif isinstance(content, ServerSentEvent):
+                #         yield f"event: {content.event}\ndata: {content.data}\n\n"
+                #     else:
+                #         yield new_event_response(
+                #             EventType.ERROR,
+                #             ErrorResponse(
+                #                 session_id=session_id,
+                #                 source=source,
+                #                 request_id=request_id,
+                #                 status_code=500,
+                #                 detail=f"Unknown response type - {str(content)}",
+                #             ),
+                #         )
             except Exception as e:
                 yield new_event_response(
                     EventType.ERROR,

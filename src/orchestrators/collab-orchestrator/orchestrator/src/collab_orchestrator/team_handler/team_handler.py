@@ -85,12 +85,18 @@ class TeamHandler(KindHandler):
     async def initialize(self):
         spec = TeamSpec.model_validate(obj=self.config.spec.model_dump())
 
-        manager_agent_base = await self.base_agent_builder.build_agent(spec.manager_agent)
-        self.manager_agent = ManagerAgent(agent=manager_agent_base, gateway=self.agent_gateway)
+        manager_agent_base = await self.base_agent_builder.build_agent(
+            spec.manager_agent
+        )
+        self.manager_agent = ManagerAgent(
+            agent=manager_agent_base, gateway=self.agent_gateway
+        )
         self.max_rounds = spec.max_rounds
         self.task_executor = TaskExecutor(self.task_agents)
 
-    async def invoke(self, chat_history: BaseMultiModalInput, request: str) -> AsyncIterable:
+    async def invoke(
+        self, chat_history: BaseMultiModalInput, request: str
+    ) -> AsyncIterable:
         session_id: str
         if chat_history.session_id:
             session_id = chat_history.session_id
@@ -100,7 +106,9 @@ class TeamHandler(KindHandler):
         source = f"{self.config.service_name}:{self.config.version}"
 
         with (
-            self.t.tracer.start_as_current_span(name="invoke-sse", attributes={"goal": request})
+            self.t.tracer.start_as_current_span(
+                name="invoke-sse", attributes={"goal": request}
+            )
             if self.t.telemetry_enabled()
             else nullcontext()
         ):
@@ -172,6 +180,9 @@ class TeamHandler(KindHandler):
                                 manager_output.action_detail.instructions,
                                 manager_output.action_detail.agent_name,
                                 conversation,
+                                session_id,
+                                source,
+                                request_id,
                             ):
                                 yield result
                         case _:

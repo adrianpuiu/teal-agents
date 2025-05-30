@@ -68,7 +68,9 @@ class ManagerAgent(InvokableAgent):
         conversation: list[ConversationMessage],
     ) -> ManagerOutput:
         team_task_agents = [
-            TeamBaseAgent(name=f"{agent.name}:{agent.version}", description=agent.description)
+            TeamBaseAgent(
+                name=f"{agent.name}:{agent.version}", description=agent.description
+            )
             for agent in task_agents
         ]
         request = ManagerInput(
@@ -77,6 +79,6 @@ class ManagerAgent(InvokableAgent):
             agent_list=team_task_agents,
             conversation=conversation,
         )
-        async with aiohttp.ClientSession() as session:
-            response = await self.invoke(session, request)
+
+        response = await self.invoke(request)
         return ManagerOutput(**response["output_pydantic"])

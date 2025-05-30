@@ -14,9 +14,8 @@ class InvokableAgent:
         self.agent = agent
         self.gateway = gateway
 
-    async def invoke(self, session: aiohttp.ClientSession, agent_input: BaseModel) -> Any:
+    async def invoke(self, agent_input: BaseModel) -> Any:
         return await self.gateway.invoke_agent(
-            session=session,
             agent_name=self.agent.name,
             agent_version=self.agent.version,
             agent_input=agent_input,

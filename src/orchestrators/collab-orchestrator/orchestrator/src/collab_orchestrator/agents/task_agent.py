@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterable
 
+import aiohttp
 from httpx_sse import ServerSentEvent
 from pydantic import BaseModel
 
@@ -26,11 +27,19 @@ class TaskAgent(InvokableAgent):
     ) -> list[HistoryMultiModalMessage]:
         user_message = HistoryMultiModalMessage(
             role="user",
-            items=[MultiModalItem(content_type=ContentType.TEXT, content=pre_requisite.goal)],
+            items=[
+                MultiModalItem(
+                    content_type=ContentType.TEXT, content=pre_requisite.goal
+                )
+            ],
         )
         assistant_message = HistoryMultiModalMessage(
             role="assistant",
-            items=[MultiModalItem(content_type=ContentType.TEXT, content=pre_requisite.result)],
+            items=[
+                MultiModalItem(
+                    content_type=ContentType.TEXT, content=pre_requisite.result
+                )
+            ],
         )
         return [user_message, assistant_message]
 
@@ -47,7 +56,9 @@ class TaskAgent(InvokableAgent):
                 items=[MultiModalItem(content_type=ContentType.TEXT, content=goal)],
             )
         )
-        return BaseMultiModalInput(session_id=session_id, chat_history=chat_history_messages)
+        return BaseMultiModalInput(
+            session_id=session_id, chat_history=chat_history_messages
+        )
 
     async def perform_task_sse(
         self,
@@ -58,3 +69,12 @@ class TaskAgent(InvokableAgent):
         chat_history = TaskAgent._build_chat_history(session_id, goal, pre_requisites)
         async for response in self.invoke_sse(chat_history):
             yield response
+
+    async def perform_task(
+        self,
+        session_id: str,
+        goal: str,
+        pre_requisites: list[PreRequisite] | None = None,
+    ) -> InvokeResponse:
+        chat_history = TaskAgent._build_chat_history(session_id, goal, pre_requisites)
+        return await self.invoke(agent_input=chat_history)
