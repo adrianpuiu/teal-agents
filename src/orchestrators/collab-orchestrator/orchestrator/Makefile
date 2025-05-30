@@ -34,3 +34,7 @@ snapshots-fix:
 .PHONY: snapshots-create
 snapshots-create:
 	uv run pytest --inline-snapshot=create
+
+.PHONE: build
+build:
+	docker build -t co:latest -f co.Dockerfile --progress=plain .

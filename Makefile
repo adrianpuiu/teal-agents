@@ -14,6 +14,10 @@ services :
 	@echo "Building Services..."
 	@docker build ${DOCKER_FLAGS} -t ao-services:latest -f ao-services.Dockerfile --progress=plain .
 
+co :
+	@echo "Building Collab Orchestrator..."
+	@docker build ${DOCKER_FLAGS} -t co:latest -f co.Dockerfile --progress=plain .
+
 clean:
 	@echo "Cleaning up..."
 	@docker rmi teal-agents:latest || true

@@ -1,6 +1,8 @@
 import logging
 from collections.abc import AsyncIterable
 from contextlib import nullcontext
+import asyncio
+from asyncio import Task, CancelledError
 
 import aiohttp
 from httpx_sse import ServerSentEvent
@@ -59,12 +61,56 @@ class TaskExecutor:
                 ),
             )
 
+            # Define a proper keepalive coroutine that can be run as a task
+            async def keepalive_coroutine():
+                try:
+                    while True:
+                        await asyncio.sleep(30)
+                        # Use a custom event type instead of 'comment' so browsers won't filter it
+                        keepalive_queue.put_nowait(
+                            f"event: keepalive\ndata: connection alive\n\n"
+                        )
+                        logging.info("Keepalive message sent to client")
+                except (CancelledError, asyncio.CancelledError):
+                    # Task was cancelled, which is expected when main task completes
+                    pass
+                except Exception as e:
+                    logging.error(f"Error in keepalive task: {e}")
+
             task_result = ""
             pre_reqs = conversation.to_pre_requisites()
+
+            # Create a queue for the keepalive messages
+            keepalive_queue = asyncio.Queue()
+
+            # Start the keepalive task
+            keepalive_task = asyncio.create_task(keepalive_coroutine())
+
             try:
-                response = await task_agent.perform_task(
+                # Create a task for the main operation
+                perform_task_coro = task_agent.perform_task(
                     session_id, instructions, pre_reqs
                 )
+                perform_task = asyncio.create_task(perform_task_coro)
+
+                # Continue until the main task is done
+                while not perform_task.done():
+                    # Wait for either the main task to complete or a keepalive message
+                    # with a small timeout to check the main task frequently
+                    try:
+                        # Wait for a keepalive message for up to 1 second
+                        message = await asyncio.wait_for(keepalive_queue.get(), 1)
+                        yield message
+                    except asyncio.TimeoutError:
+                        # No keepalive message yet, just continue checking the main task
+                        pass
+
+                # Get the result from the main task
+                response = await perform_task
+
+                # Cancel keepalive task
+                keepalive_task.cancel()
+
                 i_response = InvokeResponse.model_validate(response)
                 task_result = i_response.output_raw
                 yield new_event_response(EventType.FINAL_RESPONSE, i_response)
@@ -90,6 +136,10 @@ class TaskExecutor:
                 #             ),
                 #         )
             except Exception as e:
+                # Cancel keepalive task if main task fails
+                if keepalive_task and not keepalive_task.done():
+                    keepalive_task.cancel()
+
                 print(e)
                 logging.error(str(e))
                 yield new_event_response(
@@ -102,4 +152,17 @@ class TaskExecutor:
                         detail=f"Unexpected error occurred: {e}",
                     ),
                 )
+            finally:
+                # Ensure keepalive task is always cancelled
+                if keepalive_task and not keepalive_task.done():
+                    keepalive_task.cancel()
+                    try:
+                        await asyncio.wait_for(keepalive_task, 1)
+                    except (
+                        CancelledError,
+                        asyncio.CancelledError,
+                        asyncio.TimeoutError,
+                    ):
+                        pass
+
             conversation.add_item(task_id, agent_name, instructions, task_result)

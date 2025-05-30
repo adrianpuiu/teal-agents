@@ -36,7 +36,6 @@ class AgentGateway(BaseModel):
         agent_input: BaseModel,
     ) -> Any:
         payload = agent_input.model_dump_json()
-
         headers = {
             "taAgwKey": self.agw_key,
             "Content-Type": "application/json",
@@ -44,26 +43,42 @@ class AgentGateway(BaseModel):
         inject(headers)
         max_retries = 3
         attempt = 0
+        last_exception = None
 
         while attempt < max_retries:
             try:
-                async with httpx.AsyncClient(timeout=120.0) as client:
-                    logging.info(f"Invoking agent {agent_name} version {agent_version}")
+                # Create a new client for each attempt to avoid connection reuse issues
+                async with httpx.AsyncClient(timeout=600.0) as client:
+                    logging.info(
+                        f"Invoking agent {agent_name} version {agent_version} (attempt {attempt+1}/{max_retries})"
+                    )
                     response = await client.post(
                         self._get_endpoint_for_agent(agent_name, agent_version),
                         content=payload,
                         headers=headers,
                     )
-                    logging.info(
-                        f"Response from agent {agent_name} version {agent_version}"
-                    )
                     response.raise_for_status()
                     return response.json()
-            except Exception as e:
-                print(e)
-                logging.warn(f"Error invoking agent {agent_name}: {e}")
+            except httpx.TimeoutException as e:
+                last_exception = e
+                logging.warn(
+                    f"Timeout invoking agent {agent_name} (attempt {attempt+1}/{max_retries}): {e}"
+                )
+                # Add a small delay before retry to allow resources to clear
+                await asyncio.sleep(1)
                 attempt += 1
-        raise TimeoutError()
+            except Exception as e:
+                last_exception = e
+                logging.warn(
+                    f"Error invoking agent {agent_name} (attempt {attempt+1}/{max_retries}): {e}"
+                )
+                attempt += 1
+
+        # More specific error message with the actual exception
+        logging.error(
+            f"All {max_retries} attempts failed for agent {agent_name}: {last_exception}"
+        )
+        raise last_exception or TimeoutError("Max retries exceeded")
 
     async def invoke_agent_sse(
         self, agent_name: str, agent_version: str, agent_input: BaseModel
