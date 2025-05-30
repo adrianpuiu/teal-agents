@@ -2,6 +2,8 @@ import logging
 import uuid
 from collections.abc import AsyncIterable
 from contextlib import nullcontext
+import asyncio
+from asyncio import Task, CancelledError
 
 from ska_utils import Telemetry
 
@@ -126,15 +128,79 @@ class TeamHandler(KindHandler):
                     else nullcontext()
                 ):
                     logging.info("Invoking manager agent to determine next action")
+
+                    # Define a keepalive coroutine for the manager agent call
+                    async def manager_keepalive():
+                        try:
+                            while True:
+                                await asyncio.sleep(30)
+                                # Send a keepalive event for the manager agent call
+                                yield f"event: keepalive\ndata: manager call in progress\n\n"
+                                logging.info("Manager keepalive message sent to client")
+                        except (CancelledError, asyncio.CancelledError):
+                            # Task was cancelled, which is expected when manager call completes
+                            pass
+                        except Exception as e:
+                            logging.error(f"Error in manager keepalive task: {e}")
+
+                    # Create a queue for keepalive messages
+                    manager_keepalive_queue = asyncio.Queue()
+
+                    # Start the keepalive task
+                    async def run_keepalive():
+                        try:
+                            while True:
+                                await asyncio.sleep(30)
+                                manager_keepalive_queue.put_nowait(
+                                    f"event: keepalive\ndata: manager call in progress\n\n"
+                                )
+                                logging.info("Manager keepalive message sent to client")
+                        except (CancelledError, asyncio.CancelledError):
+                            pass
+                        except Exception as e:
+                            logging.error(f"Error in manager keepalive task: {e}")
+
+                    manager_keepalive_task = asyncio.create_task(run_keepalive())
+
                     try:
-                        manager_output = await self.manager_agent.determine_next_action(
-                            chat_history,
-                            request,
-                            self.task_agents_bases,
-                            conversation.messages,
+                        # Create a task for the manager call
+                        determine_action_coro = (
+                            self.manager_agent.determine_next_action(
+                                chat_history,
+                                request,
+                                self.task_agents_bases,
+                                conversation.messages,
+                            )
                         )
+                        determine_action_task = asyncio.create_task(
+                            determine_action_coro
+                        )
+
+                        # Continue until the manager task is done
+                        while not determine_action_task.done():
+                            # Wait for either the task to complete or a keepalive message
+                            try:
+                                # Wait for a keepalive message for up to 1 second
+                                message = await asyncio.wait_for(
+                                    manager_keepalive_queue.get(), 1
+                                )
+                                yield message
+                            except asyncio.TimeoutError:
+                                # No keepalive message yet, just continue checking the task
+                                pass
+
+                        # Get the result from the manager task
+                        manager_output = await determine_action_task
+
+                        # Cancel keepalive task
+                        manager_keepalive_task.cancel()
+
                         logging.info("Manager call completed successfully")
                     except Exception as e:
+                        # Cancel keepalive task if manager task fails
+                        if manager_keepalive_task and not manager_keepalive_task.done():
+                            manager_keepalive_task.cancel()
+
                         print(e)
                         logging.error(str(e))
                         yield new_event_response(
@@ -148,6 +214,19 @@ class TeamHandler(KindHandler):
                             ),
                         )
                         return
+                    finally:
+                        # Ensure keepalive task is always cancelled
+                        if manager_keepalive_task and not manager_keepalive_task.done():
+                            manager_keepalive_task.cancel()
+                            try:
+                                await asyncio.wait_for(manager_keepalive_task, 1)
+                            except (
+                                CancelledError,
+                                asyncio.CancelledError,
+                                asyncio.TimeoutError,
+                            ):
+                                pass
+
                     manager_output.session_id = session_id
                     manager_output.source = source
                     manager_output.request_id = request_id
