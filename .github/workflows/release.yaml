@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+      - name: setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: version and build ska-utils
+        working-directory: ./shared/ska_utils
+        run: |
+          make sync
+          uv run hatch version release
+      - name: version and build sk-agents
+        working-directory: ./src/sk-agents
+        run: |
+          make sync
+          uv run hatch version release
+      - name: version ao
+        working-directory: ./src/orchestrators/assistant-orchestrator/orchestrator
+        run: |
+          make sync
+          uv run hatch version release
+      - name: version ao-services
+        working-directory: ./src/orchestrators/assistant-orchestrator/services
+        run: |
+          make sync
+          uv run hatch version release
+      - name: version tag
+        id: extract_tag
+        working-directory: ./shared/ska_utils
+        run: |
+          VERSION=$( uv run hatch version )
+          echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
+      - name: push version updates
+        run: |
+          git checkout ${{ github.ref_name }}
+          git config --global user.name "Teal Agents Bot"
+          git config --global user.email " "
+          git tag -a "${{ steps.extract_tag.outputs.TAG }}" -m "Release ${{ steps.extract_tag.outputs.TAG }}"
+          git commit -am "bump version [skip ci]"
+          git push --set-upstream origin ${{ github.ref_name }} --follow-tags
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: main
