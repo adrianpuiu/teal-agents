@@ -9,4 +9,3 @@ class AgentConfig(BaseModel):
     system_prompt: str
     plugins: list[str] | None = None
     remote_plugins: list[str] | None = None
-    mcp_servers: list[dict] | None = None

@@ -1,0 +1,7 @@
+remote_plugins:
+  - plugin_name: "EchoMCP"
+    mcp_plugin_type: "stdio"
+    mcp_command: "python"
+    mcp_args: ["src/sk-agents/demos/11_mcp_stdio_plugin/mcp_stdio_server.py"]
+    # Optional: Add a description if your RemotePlugin model supports it
+    # description: "An MCP plugin that echoes input via stdio."
