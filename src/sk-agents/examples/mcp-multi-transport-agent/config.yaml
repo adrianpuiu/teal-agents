@@ -1,0 +1,127 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Agent demonstrating Microsoft-style MCP integration with multiple transport types"
+service_name: MultiTransportMcpAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # Microsoft-style MCP integration with multiple transport support
+  # Supports: stdio, sse, streamable_http (new in MCP 1.8), websocket
+  mcp_servers:
+    # Stdio transport (local MCP servers)
+    - name: GitHub
+      transport: stdio  # Default transport
+      command: docker
+      args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+      env:
+        GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+    
+    - name: FileSystem
+      transport: stdio
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/workspace"]
+    
+    # Streamable HTTP transport (new Microsoft transport - replaces SSE)
+    - name: RemoteAI
+      transport: streamable_http
+      url: "http://localhost:8000/mcp"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
+        Content-Type: "application/json"
+      timeout: 60
+    
+    # SSE transport (legacy remote servers)
+    - name: LegacyRemote
+      transport: sse
+      url: "http://localhost:8001/sse"
+      timeout: 30
+    
+    # WebSocket transport
+    - name: RealtimeTools
+      transport: websocket
+      url: "ws://localhost:8002/ws"
+      timeout: 45
+    
+    # Backward compatibility: legacy wrapper mode for existing deployments
+    - name: legacy_filesystem
+      transport: stdio
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/tmp"]
+      integration_mode: wrapper  # Explicitly request legacy wrapper mode
+
+  agents:
+    - name: multi_transport_agent
+      role: "Agent with multiple MCP transport capabilities"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are an advanced AI assistant with access to multiple MCP servers via different transports.
+        
+        Available tools by transport type:
+        
+        STDIO TRANSPORT (Local servers):
+        - GitHub.search_repositories(query) - Search GitHub repositories
+        - GitHub.create_repository(name, description, private) - Create new repository
+        - GitHub.get_file_contents(owner, repo, path) - Get file contents
+        - FileSystem.list_directory(path) - List directory contents
+        - FileSystem.read_file(path) - Read file contents
+        - FileSystem.write_file(path, content) - Write to file
+        
+        STREAMABLE HTTP TRANSPORT (Remote AI services):
+        - RemoteAI.generate_text(prompt, model) - Generate text using remote AI
+        - RemoteAI.analyze_data(data, analysis_type) - Analyze data remotely
+        
+        SSE TRANSPORT (Legacy remote):
+        - LegacyRemote.process_request(data) - Process via legacy SSE
+        
+        WEBSOCKET TRANSPORT (Real-time):
+        - RealtimeTools.stream_data(query) - Real-time data streaming
+        - RealtimeTools.live_updates(subscription) - Live updates
+        
+        LEGACY WRAPPER MODE (Backward compatibility):
+        - call_mcp_tool("legacy_filesystem", "list_directory", '{"path": "/tmp"}')
+        - list_mcp_tools() - List all available tools
+        
+        Choose the appropriate transport and tools based on the user's needs:
+        - Use stdio for local file/git operations
+        - Use streamable_http for remote AI processing
+        - Use websocket for real-time streaming
+        - Use legacy wrapper only when specifically needed
+        
+        Always explain which transport you're using and why.
+
+  tasks:
+    - name: multi_transport_task
+      task_no: 1
+      description: "Demonstrate multi-transport MCP integration capabilities"
+      instructions: |
+        Help users with tasks requiring different MCP transport types:
+        
+        1. STDIO TRANSPORT - Local operations:
+           - File system operations (read, write, list)
+           - GitHub repository management
+           - Local development tools
+        
+        2. STREAMABLE HTTP TRANSPORT - Remote AI services:
+           - Remote text generation and analysis
+           - Cloud-based AI processing
+           - Distributed AI workflows
+        
+        3. SSE TRANSPORT - Legacy remote services:
+           - Server-sent event based services
+           - Legacy remote tool integration
+        
+        4. WEBSOCKET TRANSPORT - Real-time operations:
+           - Live data streaming
+           - Real-time collaboration
+           - Continuous monitoring
+        
+        Always choose the most appropriate transport for each task and explain
+        the benefits of that transport choice to the user.
+        
+        Transport Selection Guidelines:
+        - stdio: Fast, reliable, local tools (GitHub, filesystem)
+        - streamable_http: Modern remote services, better error handling
+        - sse: Legacy remote services, one-way streaming
+        - websocket: Bidirectional real-time communication
+      agent: multi_transport_agent

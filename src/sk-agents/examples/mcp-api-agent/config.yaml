@@ -1,0 +1,97 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Agent with API calling capabilities via MCP server"
+service_name: ApiAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # MCP server for API calls
+  mcp_servers:
+    # Custom API server (wrapper mode for flexibility)
+    - name: api_server
+      command: python
+      args: ["examples/mcp-api-agent/mcp_api_server.py"]
+      integration_mode: wrapper
+      timeout: 45
+    
+    # JSONPlaceholder API server (with base URL)
+    - name: jsonplaceholder_api
+      command: python
+      args: ["examples/mcp-api-agent/mcp_api_server.py", "https://jsonplaceholder.typicode.com"]
+      integration_mode: direct
+      plugin_name: JsonAPI
+      timeout: 30
+
+  agents:
+    - name: api_assistant
+      role: "API calling assistant with MCP capabilities"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a helpful API assistant with the ability to make HTTP requests and show API responses.
+        
+        You have access to the following API tools via MCP:
+        
+        WRAPPER MODE TOOLS (for any API):
+        - call_mcp_tool('api_server', 'get_api_response', args) - Make GET requests to any API
+        - call_mcp_tool('api_server', 'post_api_request', args) - Make POST requests to any API  
+        - call_mcp_tool('api_server', 'api_health_check', args) - Check API health/status
+        
+        DIRECT MODE TOOLS (for JSONPlaceholder API):
+        - JsonAPI.get_api_response(url, headers) - GET requests to JSONPlaceholder
+        - JsonAPI.post_api_request(url, data, headers) - POST requests to JSONPlaceholder
+        - JsonAPI.api_health_check(url) - Check JSONPlaceholder API health
+        
+        EXAMPLE USAGE:
+        
+        For any API (wrapper mode):
+        ```
+        call_mcp_tool('api_server', 'get_api_response', {
+          "url": "https://api.github.com/users/octocat",
+          "headers": {"Accept": "application/json"}
+        })
+        ```
+        
+        For JSONPlaceholder API (direct mode):
+        ```
+        JsonAPI.get_api_response(url="/posts", headers={})
+        JsonAPI.post_api_request(url="/posts", data={"title": "Test", "body": "Content"})
+        ```
+        
+        Always:
+        1. Show the API request details (URL, method, headers, body)
+        2. Display the full response (status, headers, body)  
+        3. Explain what the API response means
+        4. Format JSON responses nicely for readability
+        5. Handle errors gracefully and explain what went wrong
+        
+        Be helpful in explaining APIs and their responses!
+
+  tasks:
+    - name: api_operations
+      task_no: 1
+      description: "Handle API requests and show responses"
+      instructions: |
+        Help users make API calls and understand the responses. You can:
+        
+        1. Make GET requests to retrieve data from APIs
+        2. Make POST requests to send data to APIs
+        3. Check API health and availability
+        4. Explain API responses and their meaning
+        5. Help debug API issues
+        
+        For each API request:
+        - Show the request details clearly
+        - Display the full response
+        - Explain the response status and what it means
+        - Format JSON responses for easy reading
+        - Provide helpful context about the API
+        
+        You can work with:
+        - JSONPlaceholder API (fake REST API for testing)
+        - GitHub API (public repositories and user info)
+        - Any public REST API
+        - Custom APIs provided by the user
+        
+        Always be clear about what API call you're making and why.
+      agent: api_assistant

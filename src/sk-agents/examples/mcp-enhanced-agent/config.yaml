@@ -1,0 +1,86 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Enhanced MCP agent demonstrating both wrapper and direct integration modes"
+service_name: EnhancedMCPAgent
+version: 0.1
+input_type: BaseInput
+spec:
+  agents:
+    - name: default
+      role: "Enhanced MCP Agent"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are an advanced agent with enhanced MCP capabilities. You have access to tools through two different integration modes:
+        
+        DIRECT MODE TOOLS (appear as native functions):
+        - FileSystem plugin functions for file operations
+        - GitHub plugin functions for repository management
+        
+        WRAPPER MODE TOOLS (accessed through generic MCP functions):
+        - SQLite database operations
+        - Web search capabilities
+        
+        When using direct mode tools, call them directly by name (e.g., read_file, create_repository).
+        When using wrapper mode tools, use the generic MCP functions (call_mcp_tool, list_mcp_tools).
+        
+        Always be helpful and explain what tools you're using and why.
+      
+      # Enhanced MCP configuration with mixed integration modes
+      mcp_servers:
+        # Direct mode: filesystem tools appear as native SK functions
+        - name: filesystem
+          command: npx
+          args: ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+          env: {}
+          timeout: 30
+          integration_mode: direct
+          plugin_name: FileSystem
+          
+        # Direct mode: GitHub tools appear as native SK functions  
+        - name: github
+          command: npx
+          args: ["-y", "@modelcontextprotocol/server-github"]
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+          timeout: 30
+          integration_mode: direct
+          plugin_name: GitHub
+          
+        # Wrapper mode: accessed through generic MCP functions
+        - name: sqlite
+          command: python
+          args: ["run_sqlite_mcp_server.py", "/workspace/data.db"]
+          env: {}
+          timeout: 30
+          integration_mode: wrapper
+          
+        # Wrapper mode: web search through generic functions
+        - name: brave_search
+          command: npx
+          args: ["-y", "@modelcontextprotocol/server-brave-search"]
+          env:
+            BRAVE_API_KEY: "${BRAVE_API_KEY}"
+          timeout: 30
+          integration_mode: wrapper
+
+  tasks:
+    - name: enhanced_mcp_task
+      task_no: 1
+      description: "Demonstrate enhanced MCP integration capabilities"
+      instructions: |
+        You can now access MCP tools in two different ways:
+        
+        1. DIRECT MODE (FileSystem, GitHub):
+           - Tools appear as native Semantic Kernel functions
+           - Call them directly: read_file(path="/workspace/readme.txt") 
+           - Better function calling reliability
+           - Native parameter validation
+           
+        2. WRAPPER MODE (SQLite, BraveSearch):
+           - Tools accessed through generic MCP functions
+           - Use: call_mcp_tool(server_name="sqlite", tool_name="execute_query", arguments='{"query": "SELECT * FROM users"}')
+           - Full backward compatibility
+           - Flexible for dynamic tool discovery
+           
+        Always explain which integration mode you're using and why it's appropriate for the task.
+      agent: default

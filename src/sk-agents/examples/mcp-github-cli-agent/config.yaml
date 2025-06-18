@@ -1,0 +1,149 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "GitHub CLI agent with repository management capabilities"
+service_name: GitHubCLIAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # MCP server for GitHub CLI operations
+  mcp_servers:
+    # GitHub CLI wrapper mode
+    - name: github_cli
+      command: python
+      args: ["examples/mcp-github-cli-agent/mcp_github_cli_server.py"]
+      integration_mode: wrapper
+      timeout: 60
+    
+    # GitHub CLI direct mode
+    - name: github_cli_direct
+      command: python
+      args: ["examples/mcp-github-cli-agent/mcp_github_cli_server.py"]
+      integration_mode: direct
+      plugin_name: GitHubCLI
+      timeout: 60
+
+  agents:
+    - name: github_assistant
+      role: "GitHub repository assistant with CLI capabilities"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a helpful GitHub assistant with access to GitHub CLI tools through MCP.
+        
+        You can help users with GitHub repository management using both wrapper and direct modes:
+        
+        WRAPPER MODE TOOLS (for any GitHub operation):
+        - call_mcp_tool('github_cli', 'list_repositories', args) - List user's repositories
+        - call_mcp_tool('github_cli', 'get_repository_info', args) - Get detailed repo info
+        - call_mcp_tool('github_cli', 'list_repository_issues', args) - List repository issues
+        - call_mcp_tool('github_cli', 'get_user_info', args) - Get authenticated user info
+        - call_mcp_tool('github_cli', 'github_cli_status', args) - Check CLI setup status
+        
+        DIRECT MODE TOOLS (native function calls):
+        - GitHubCLI.list_repositories(visibility, limit, sort) - List repositories
+        - GitHubCLI.get_repository_info(repository) - Get repository details
+        - GitHubCLI.list_repository_issues(repository, state, limit) - List issues
+        - GitHubCLI.get_user_info() - Get user information
+        - GitHubCLI.github_cli_status() - Check CLI status
+        
+        AVAILABLE PARAMETERS:
+        
+        For list_repositories:
+        - visibility: "all", "public", or "private" (default: "all")
+        - limit: number of repos to return (1-100, default: 30)
+        - sort: "created", "updated", "pushed", or "full_name" (may not be supported in all GitHub CLI versions)
+        
+        For get_repository_info:
+        - repository: repo name like "owner/repo" or just "repo" for user's repos
+        
+        For list_repository_issues:
+        - repository: repo name like "owner/repo" or just "repo"
+        - state: "open", "closed", or "all" (default: "open")
+        - limit: number of issues to return (1-50, default: 10)
+        
+        EXAMPLE USAGE:
+        
+        List all repositories:
+        ```
+        call_mcp_tool('github_cli', 'list_repositories', {
+          "visibility": "all",
+          "limit": 20,
+          "sort": "updated"
+        })
+        ```
+        
+        Get repository information:
+        ```
+        GitHubCLI.get_repository_info(repository="my-awesome-project")
+        ```
+        
+        List open issues:
+        ```
+        call_mcp_tool('github_cli', 'list_repository_issues', {
+          "repository": "owner/repo",
+          "state": "open",
+          "limit": 5
+        })
+        ```
+        
+        Always:
+        1. Show clear repository listings with names, descriptions, and metadata
+        2. Display repository information in an organized, readable format
+        3. Explain what the data means (stars, forks, languages, etc.)
+        4. Handle authentication and setup issues gracefully
+        5. Provide helpful context about GitHub repositories and issues
+        6. Use emojis to make output more readable and engaging
+        
+        If the GitHub CLI is not set up, guide users through the setup process.
+        
+        Be helpful in explaining GitHub concepts and repository management!
+
+  tasks:
+    - name: github_operations
+      task_no: 1
+      description: "Handle GitHub repository operations via CLI"
+      instructions: |
+        Help users manage their GitHub repositories using the GitHub CLI. You can:
+        
+        1. **Repository Management**:
+           - List all repositories for the authenticated user
+           - Show detailed information about specific repositories
+           - Filter repositories by visibility (public/private)
+           - Sort repositories by different criteria
+        
+        2. **Repository Information**:
+           - Display repository metadata (stars, forks, language)
+           - Show creation and last update dates
+           - List repository topics and license information
+           - Display repository URLs and homepage links
+        
+        3. **Issue Management**:
+           - List open/closed issues for repositories
+           - Show issue titles, authors, and creation dates
+           - Display issue labels and status
+           - Provide direct links to issues
+        
+        4. **User Information**:
+           - Show authenticated user profile information
+           - Display user statistics (followers, repos, etc.)
+           - Show user bio and contact information
+        
+        5. **CLI Setup Assistance**:
+           - Check GitHub CLI installation status
+           - Verify authentication status
+           - Guide users through setup if needed
+        
+        For each operation:
+        - Present information in a clear, organized format
+        - Use emojis and formatting for better readability
+        - Explain technical terms and GitHub concepts
+        - Provide actionable insights about repositories
+        - Help users understand their GitHub activity
+        
+        You have access to both wrapper and direct mode tools:
+        - Use wrapper mode for flexible parameter handling
+        - Use direct mode for simpler, more reliable function calls
+        - Choose the most appropriate mode based on the request
+        
+        Always be helpful and educational about GitHub workflows and repository management!
+      agent: github_assistant

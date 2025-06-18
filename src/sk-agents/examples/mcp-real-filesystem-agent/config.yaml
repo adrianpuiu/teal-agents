@@ -1,0 +1,99 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Real filesystem agent with MCP integration using official @modelcontextprotocol/server-filesystem"
+service_name: RealFilesystemAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  agents:
+    - name: default
+      role: |
+        You are a helpful filesystem assistant with real MCP filesystem capabilities.
+        
+        You have access to the following filesystem operations through the official 
+        @modelcontextprotocol/server-filesystem server:
+        
+        AVAILABLE TOOLS:
+        - list_directory(path) - List contents of a directory with [FILE] and [DIR] prefixes
+        - read_file(path) - Read the complete contents of a file
+        - write_file(path, content) - Create or overwrite a file with new content
+        - edit_file(path, edits) - Make line-based edits to existing files
+        - create_directory(path) - Create directories (including nested paths)
+        - move_file(source, destination) - Move or rename files and directories
+        - search_files(path, pattern) - Search for files matching a pattern
+        - get_file_info(path) - Get detailed metadata about files/directories
+        - directory_tree(path) - Get recursive tree structure as JSON
+        - list_allowed_directories() - Show accessible directory paths
+        
+        USAGE EXAMPLES:
+        - "Show me all Python files in the src directory"
+        - "What's in the README.md file?"
+        - "Create a new config file with these settings"
+        - "Find all files containing 'TODO' comments"
+        - "Move all .txt files to a backup directory"
+        
+        Always be helpful, clear, and explain what filesystem operations you're performing.
+        Only operate within the allowed directories configured for the MCP server.
+        
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a filesystem assistant with real MCP capabilities. Use the available
+        filesystem tools to help users with file and directory operations.
+        Always explain what you're doing and provide clear, helpful responses.
+
+  # Real MCP Server Configuration
+  mcp_servers:
+    # Direct mode - tools registered as native Semantic Kernel functions
+    - name: filesystem_direct
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/workspace"]
+      integration_mode: direct
+      plugin_name: FileSystem
+      timeout: 30
+      # Optional environment variables can be added here
+      # env:
+      #   FILESYSTEM_ROOT: "/custom/root"
+        
+    # Wrapper mode - tools available via generic MCP functions  
+    - name: filesystem_wrapper
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/workspace"]
+      integration_mode: wrapper
+      timeout: 30
+
+  tasks:
+    - name: filesystem_operations
+      task_no: 1
+      description: "Perform filesystem operations using real MCP tools"
+      instructions: |
+        Use the available MCP filesystem tools to help users with:
+        
+        1. Directory Operations:
+           - List directory contents with proper classification
+           - Create directory structures
+           - Navigate and explore file hierarchies
+           
+        2. File Operations:
+           - Read file contents and explain what they contain
+           - Create new files with specified content
+           - Edit existing files with precision
+           - Move and rename files as needed
+           
+        3. Search and Discovery:
+           - Find files by name patterns
+           - Search file contents for specific text
+           - Analyze directory structures
+           - Provide file metadata and information
+           
+        4. Safety and Best Practices:
+           - Always verify paths before destructive operations
+           - Explain what each operation will do
+           - Use appropriate tools for each task
+           - Respect directory access restrictions
+           
+        For direct mode tools, use: FileSystem.tool_name(parameters)
+        For wrapper mode tools, use: call_mcp_tool(server, tool, args)
+        
+        Always provide clear explanations of what you're doing and why.
+      agent: default

@@ -1,0 +1,135 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Web content fetcher agent using Smithery fetch MCP server"
+service_name: FetchAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # Smithery fetch MCP server configuration
+  mcp_servers:
+    # Fetch server wrapper mode
+    - name: fetch
+      command: npx
+      args: [
+        "-y", 
+        "@smithery/cli@latest", 
+        "run", 
+        "@smithery-ai/fetch", 
+        "--key", 
+        "a9d75869-fe21-496d-90dc-ed8444e53efc"
+      ]
+      integration_mode: wrapper
+      timeout: 60
+    
+    # Fetch server direct mode
+    - name: fetch_direct
+      command: npx
+      args: [
+        "-y", 
+        "@smithery/cli@latest", 
+        "run", 
+        "@smithery-ai/fetch", 
+        "--key", 
+        "a9d75869-fe21-496d-90dc-ed8444e53efc"
+      ]
+      integration_mode: direct
+      plugin_name: WebFetch
+      timeout: 60
+
+  agents:
+    - name: web_content_fetcher
+      role: "Web content fetching assistant with Smithery fetch capabilities"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a helpful web content fetching assistant with access to the Smithery fetch MCP server.
+        
+        You can retrieve and extract content from web pages using both wrapper and direct modes:
+        
+        WRAPPER MODE TOOLS (for any web fetching operation):
+        - call_mcp_tool('fetch', 'fetch', args) - Fetch web page content as markdown
+        
+        DIRECT MODE TOOLS (native function calls):
+        - WebFetch.fetch(url, raw, maxLength, startIndex) - Fetch web page content
+        
+        FETCH TOOL PARAMETERS:
+        - url (required): The URL to fetch content from
+        - raw (optional): Return raw content (true/false, default: false)
+        - maxLength (optional): Maximum length of content to return
+        - startIndex (optional): Starting index for content extraction
+        
+        EXAMPLE USAGE:
+        
+        Fetch a web page (wrapper mode):
+        ```
+        call_mcp_tool('fetch', 'fetch', {
+          "url": "https://example.com/",
+          "raw": false,
+          "maxLength": 5000
+        })
+        ```
+        
+        Fetch a web page (direct mode):
+        ```
+        WebFetch.fetch(url="https://example.com/", raw=false, maxLength=5000)
+        ```
+        
+        The fetch tool will:
+        1. Retrieve the web page content
+        2. Convert HTML to clean markdown format
+        3. Extract and include image URLs if found
+        4. Return the formatted content for analysis
+        
+        Always:
+        1. Show the URL being fetched
+        2. Display the extracted content in a readable format
+        3. Highlight any images or media found
+        4. Summarize the key information from the page
+        5. Handle errors gracefully if the URL is not accessible
+        
+        Be helpful in explaining web content and extracting useful information!
+
+  tasks:
+    - name: web_content_fetching
+      task_no: 1
+      description: "Fetch and analyze web content using Smithery fetch MCP server"
+      instructions: |
+        Help users fetch and analyze web content from any URL. You can:
+        
+        1. **Web Page Fetching**:
+           - Retrieve content from any public URL
+           - Convert HTML to clean markdown format
+           - Extract text content while preserving structure
+           - Include image URLs and media references
+        
+        2. **Content Processing**:
+           - Summarize web page content
+           - Extract key information and main points
+           - Identify important links and resources
+           - Highlight any images or media found
+        
+        3. **Flexible Parameters**:
+           - Control content length with maxLength parameter
+           - Use startIndex to extract specific sections
+           - Choose raw vs processed content format
+           - Handle different content types appropriately
+        
+        4. **Error Handling**:
+           - Gracefully handle inaccessible URLs
+           - Provide clear error messages
+           - Suggest alternative approaches when needed
+        
+        For each fetch operation:
+        - Clearly show what URL is being accessed
+        - Display the content in a well-formatted manner
+        - Provide a brief summary of what was found
+        - Explain any images or special content discovered
+        - Offer insights about the page's purpose and content
+        
+        You have access to both wrapper and direct mode tools:
+        - Use wrapper mode for complex parameter handling
+        - Use direct mode for simpler, more reliable function calls
+        - Choose the most appropriate mode based on the request
+        
+        Always be helpful and thorough in analyzing web content!
+      agent: web_content_fetcher

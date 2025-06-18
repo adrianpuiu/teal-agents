@@ -1,9 +1,21 @@
 # Teal Agents Platform
+
+A comprehensive Python-based framework for creating and orchestrating AI-powered agents, built on Microsoft's Semantic Kernel with enhanced MCP (Model Context Protocol) integration.
+
 ## Overview
-The Agent Platform aims to provide two major sets of functionality:
-1. A core framework for creating and deploying individual agents
-2. A set of orchestrators (and supporting services) which allow you to compose
-   multiple agents for more complex use cases
+
+The Teal Agents Platform provides two major sets of functionality:
+1. **Core Agent Framework** - Config-first approach to creating individual agents with MCP integration
+2. **Orchestrators** - Patterns for composing multiple agents for complex use cases
+
+## Key Features
+
+- **Config-First Development** - Create agents primarily through YAML configuration
+- **MCP Integration** - Connect to external tools via Model Context Protocol servers
+- **Microsoft Semantic Kernel** - Built on proven, enterprise-ready foundations
+- **Multi-Modal Support** - Handle text, images, and other content types
+- **Plugin Architecture** - Extend capabilities with custom or remote plugins
+- **Production Ready** - Enterprise deployment with Docker and orchestration
 
 ## Core Agent Framework
 The core framework can be found in the src/sk-agents directory. For more 

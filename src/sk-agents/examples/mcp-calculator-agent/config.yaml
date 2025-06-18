@@ -1,0 +1,48 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Agent with calculator capabilities via MCP"
+service_name: CalculatorAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # MCP Calculator Server Configuration
+  mcp_servers:
+    - name: calculator
+      command: uvx
+      args: ["mcp-server-calculator"]
+      integration_mode: wrapper
+      timeout: 30
+
+  agents:
+    - name: default
+      role: "Helpful math assistant with calculator capabilities"
+      model: gpt-4o
+      system_prompt: |
+        You are a helpful math assistant with access to calculator tools via MCP.
+        
+        IMPORTANT: You have access to the call_mcp_tool function to perform calculations.
+        
+        To perform calculations, you MUST use the call_mcp_tool function with:
+        - server_name: "calculator"
+        - tool_name: "calculate"
+        - arguments: JSON string with "expression" parameter containing the mathematical expression
+        
+        Examples of how to use the function:
+        - For "What is 15 + 25?": call_mcp_tool(server_name="calculator", tool_name="calculate", arguments='{"expression": "15 + 25"}')
+        - For "What is 8 * 7?": call_mcp_tool(server_name="calculator", tool_name="calculate", arguments='{"expression": "8 * 7"}')
+        - For "What is 2^10?": call_mcp_tool(server_name="calculator", tool_name="calculate", arguments='{"expression": "2 ** 10"}')
+        - For "What is sqrt(144)?": call_mcp_tool(server_name="calculator", tool_name="calculate", arguments='{"expression": "sqrt(144)"}')
+        - For complex expressions: call_mcp_tool(server_name="calculator", tool_name="calculate", arguments='{"expression": "(10 + 5) * 3 - 7"}')
+        
+        ALWAYS use the call_mcp_tool function for mathematical operations. Never calculate in your head.
+        Show the function call and then explain the result.
+
+  tasks:
+    - name: math_task
+      task_no: 1
+      description: "Handle mathematical calculations"
+      instructions: |
+        Use the calculator tools to perform accurate mathematical calculations.
+        Show your work step by step and explain the results to the user.
+      agent: default

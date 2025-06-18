@@ -1,0 +1,86 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Agent with Microsoft-style simplified MCP integration - perfectly aligned with SK Python patterns"
+service_name: SimplifiedMcpAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # Microsoft-style MCP integration (April 2025) - direct alignment with Semantic Kernel Python
+  # Reference: https://devblogs.microsoft.com/semantic-kernel/semantic-kernel-adds-model-context-protocol-mcp-support-for-python/
+  mcp_servers:
+    # Equivalent to: async with MCPStdioPlugin(name="GitHub", command="docker", args=[...]) as plugin
+    - name: GitHub
+      command: docker
+      args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+      env:
+        GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+    
+    # Equivalent to: async with MCPStdioPlugin(name="FileSystem", command="npx", args=[...]) as plugin  
+    - name: FileSystem
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/workspace"]
+    
+    # Multiple transport support example (when available)
+    # - name: RemoteTools
+    #   transport: sse
+    #   url: "http://localhost:8000/sse"
+    
+    # NEW: Streamable HTTP transport (Microsoft MCP 1.8+)
+    - name: CloudAI
+      transport: streamable_http
+      url: "http://localhost:8000/mcp"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
+        Content-Type: "application/json"
+      timeout: 60
+    
+    # Legacy mode example (for backward compatibility with existing teal-agents deployments)
+    - name: legacy_filesystem
+      command: npx  # Old format - command without transport field defaults to stdio
+      args: ["@modelcontextprotocol/server-filesystem", "/tmp"]
+      integration_mode: wrapper  # Explicitly request legacy wrapper mode
+
+  agents:
+    - name: simplified_agent
+      role: "Agent using Microsoft-style simplified MCP integration"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a helpful assistant with access to GitHub and filesystem tools.
+        
+        Available tools (Microsoft-style direct integration):
+        
+        GitHub tools:
+        - GitHub.search_repositories(query) - Search for GitHub repositories
+        - GitHub.create_repository(name, description, private) - Create a new repository
+        - GitHub.get_file_contents(owner, repo, path) - Get file contents from a repository
+        - GitHub.create_issue(owner, repo, title, body) - Create an issue
+        
+        FileSystem tools:
+        - FileSystem.list_directory(path) - List directory contents
+        - FileSystem.read_file(path) - Read file contents
+        - FileSystem.write_file(path, content) - Write to a file
+        
+        Legacy tools (wrapper mode for backward compatibility):
+        - call_mcp_tool(server, tool, args) - Generic wrapper function
+        - list_mcp_tools() - List all available MCP tools
+        
+        Use the appropriate tools based on the user's request. The simplified tools
+        (GitHub.*, FileSystem.*) are more reliable for LLM function calling.
+
+  tasks:
+    - name: simplified_mcp_task
+      task_no: 1
+      description: "Demonstrate Microsoft-style simplified MCP integration"
+      instructions: |
+        Help users with GitHub and filesystem operations using the simplified MCP integration.
+        
+        Key benefits of simplified mode:
+        1. Tools are registered directly as Semantic Kernel functions
+        2. Better LLM function calling reliability 
+        3. Cleaner tool names (GitHub.search_repositories vs call_mcp_tool)
+        4. Follows Microsoft's official MCP integration pattern
+        
+        Use FileSystem.* for file operations and GitHub.* for repository operations.
+        Only use legacy call_mcp_tool() for servers explicitly configured with wrapper mode.
+      agent: simplified_agent

@@ -1,0 +1,59 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "YAML-configured agent with real MCP filesystem integration"
+service_name: YamlMcpAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  # Global MCP servers - available to all agents
+  mcp_servers:
+    - name: global_filesystem
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem", "/tmp"]
+      integration_mode: wrapper
+      timeout: 30
+
+  agents:
+    - name: filesystem_agent
+      role: "Filesystem assistant with YAML-configured MCP tools"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a helpful filesystem assistant with MCP capabilities configured via YAML.
+        
+        You have access to filesystem tools through the Model Context Protocol:
+        - call_mcp_tool(server, tool, args) - Call any MCP tool
+        - list_mcp_tools() - List available MCP tools
+        
+        Available servers and tools:
+        - global_filesystem: Basic filesystem operations in /tmp
+        - agent_filesystem: Advanced filesystem operations in current directory
+        
+        Always explain what filesystem operations you're performing and be helpful!
+      
+      # Agent-specific MCP servers - merged with global ones
+      mcp_servers:
+        - name: agent_filesystem
+          command: npx
+          args: ["@modelcontextprotocol/server-filesystem", "."]
+          integration_mode: direct
+          plugin_name: FileSystem
+          timeout: 30
+
+  tasks:
+    - name: filesystem_operations
+      task_no: 1
+      description: "Perform filesystem operations using YAML-configured MCP tools"
+      instructions: |
+        Help the user with filesystem operations using the MCP tools configured in YAML.
+        
+        You have access to two MCP filesystem servers:
+        1. global_filesystem (wrapper mode) - operates in /tmp directory
+        2. agent_filesystem (direct mode) - operates in current directory
+        
+        Use the appropriate server based on where the user wants to work:
+        - For temporary files: use global_filesystem with call_mcp_tool()
+        - For current directory: use FileSystem.* functions or agent_filesystem
+        
+        Always be clear about which directory you're operating in and what you're doing.
+      agent: filesystem_agent
