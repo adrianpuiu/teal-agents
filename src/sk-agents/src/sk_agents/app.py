@@ -1,4 +1,5 @@
 import logging
+import nest_asyncio
 
 from fastapi import FastAPI
 from pydantic_yaml import parse_yaml_file_as
@@ -17,6 +18,7 @@ from sk_agents.ska_types import (
 
 logging.basicConfig(level=logging.INFO)
 
+nest_asyncio.apply()
 AppConfig.add_configs(configs)
 app_config = AppConfig()
 
