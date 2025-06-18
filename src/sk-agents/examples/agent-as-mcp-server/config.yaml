@@ -1,0 +1,38 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Agent exposed as MCP Server - equivalent to Microsoft's agent_mcp_server.py"
+service_name: MenuAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  agents:
+    - name: host
+      role: "Menu Assistant"
+      model: gpt-4o-mini
+      system_prompt: |
+        Answer questions about the menu.
+        
+        You have access to menu functions:
+        - get_specials() - Get daily specials from the menu
+        - get_item_price(menu_item) - Get the price of a specific menu item
+        
+        Be helpful and provide accurate menu information to customers.
+      
+      # Custom plugin for menu functionality
+      plugins:
+        - MenuPlugin
+
+  tasks:
+    - name: menu_assistance
+      task_no: 1
+      description: "Provide menu information and assistance"
+      instructions: |
+        Help customers with menu inquiries including:
+        1. Daily specials and featured items
+        2. Pricing information for menu items
+        3. General menu questions and recommendations
+        
+        Use the available menu functions to provide accurate information.
+        Be friendly and helpful in your responses.
+      agent: host

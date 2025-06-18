@@ -45,11 +45,14 @@ class SequentialSkagents(BaseHandler):
         self.tasks = []
         for i in range(len(sorted_configs) - 1):
             task_config = sorted_configs[i]
-            self.tasks.append(task_builder.build_task(task_config, self.config.get_agents()))
+            self.tasks.append(
+                task_builder.build_task(task_config, self.config.get_agents(), self.config)
+            )
         self.tasks.append(
             task_builder.build_task(
                 sorted_configs[-1],
                 self.config.get_agents(),
+                self.config,
                 self.config.config.output_type,
             )
         )

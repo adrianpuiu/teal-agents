@@ -19,6 +19,8 @@ dependencies = [
     "lock",
     "a2a-sdk==0.2.4",
     "redis>=6.0.0",
+    "mcp-server-calculator>=0.2.0",
+    "mcp>=1.9.4",
 ]
 
 [project.urls]
@@ -111,3 +113,14 @@ exclude_also = [
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "mcp: marks tests as MCP-related tests",
+    "slow: marks tests as slow running",
+    "unit: marks tests as unit tests",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

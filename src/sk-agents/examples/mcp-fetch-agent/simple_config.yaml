@@ -1,0 +1,37 @@
+apiVersion: skagents/v1
+kind: Sequential
+description: "Simple web content fetcher using built-in tools"
+service_name: SimpleFetchAgent
+version: 0.1
+input_type: BaseInput
+
+spec:
+  agents:
+    - name: web_fetcher
+      role: "Web content fetcher with built-in HTTP capabilities"
+      model: gpt-4o-mini
+      system_prompt: |
+        You are a web content fetching assistant. While you don't have direct web access,
+        you can help users understand how to fetch web content and analyze URLs.
+        
+        When users ask you to fetch content:
+        1. Explain what you would do if you had web access
+        2. Describe the expected content from common sites
+        3. Provide guidance on web scraping approaches
+        4. Suggest tools and methods for web content extraction
+        
+        For https://example.com/, you can explain that it's a simple demo page
+        that typically contains "Example Domain" as the title and basic text
+        about it being a domain used for examples.
+
+  tasks:
+    - name: web_guidance
+      task_no: 1
+      description: "Provide web fetching guidance and URL analysis"
+      instructions: |
+        Help users with web content fetching by:
+        1. Analyzing the URL structure and purpose
+        2. Explaining what content might be expected
+        3. Providing technical guidance on fetching approaches
+        4. Suggesting alternative tools and methods
+      agent: web_fetcher

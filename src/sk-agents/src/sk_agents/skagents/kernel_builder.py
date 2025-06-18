@@ -2,11 +2,11 @@ from semantic_kernel.kernel import Kernel
 from ska_utils import AppConfig
 
 from sk_agents.extra_data_collector import ExtraDataCollector
+from sk_agents.mcp_integration import SimplifiedMCPIntegration
 from sk_agents.plugin_loader import get_plugin_loader
 from sk_agents.ska_types import ModelType
 from sk_agents.skagents.chat_completion_builder import ChatCompletionBuilder
 from sk_agents.skagents.remote_plugin_loader import RemotePluginLoader
-from sk_agents.mcp_integration import MCPPlugin, MCPPluginFactory, EnhancedMCPPlugin, EnhancedMCPPluginFactory
 
 
 class KernelBuilder:
@@ -77,31 +77,69 @@ class KernelBuilder:
         return kernel
 
     def _load_mcp_plugins(self, mcp_servers: list[dict] | None, kernel: Kernel) -> Kernel:
-        """Load MCP servers as Semantic Kernel plugins with enhanced dual-mode support."""
+        """Load MCP servers as Semantic Kernel plugins with Microsoft-style simplified integration."""
         if not mcp_servers or len(mcp_servers) < 1:
             return kernel
-        
+
         try:
-            # Use enhanced MCP plugin with dual mode support
-            mcp_plugin = EnhancedMCPPluginFactory.create_from_config(mcp_servers)
-            
-            # Add wrapper functions as traditional plugin for backward compatibility
-            kernel.add_plugin(mcp_plugin, "mcp")
-            
-            # Register direct tools for servers configured in direct mode
-            import asyncio
-            try:
-                # Try to register direct tools if any servers are in direct mode
-                asyncio.create_task(mcp_plugin.register_direct_tools_to_kernel(kernel))
-            except Exception as direct_error:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Could not register direct MCP tools (will use wrapper mode): {direct_error}")
+            # Use Microsoft-style simplified integration (only mode supported)
+            return self._load_simplified_mcp_plugins(mcp_servers, kernel)
                 
         except Exception as e:
             # Log the error but don't fail the kernel build
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to load MCP plugins: {e}")
+            logger.warning(f"Could not load MCP plugins: {e}")
+            return kernel
+
+    def _load_simplified_mcp_plugins(self, mcp_servers: list[dict], kernel: Kernel) -> Kernel:
+        """Load MCP servers using Microsoft-style simplified integration."""
+        import asyncio
+        import logging
+        import concurrent.futures
+        import threading
+        logger = logging.getLogger(__name__)
         
+        try:
+            # Check if we're already in an event loop
+            try:
+                current_loop = asyncio.get_running_loop()
+                # We're in a running loop, use thread-based execution
+                logger.info("Detected running event loop, using thread-based MCP initialization")
+                
+                def run_mcp_integration():
+                    """Run MCP integration in a separate thread with its own event loop."""
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            SimplifiedMCPIntegration.add_mcp_tools_to_kernel(kernel, mcp_servers)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                # Run in thread pool to avoid event loop conflicts
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_mcp_integration)
+                    future.result(timeout=30)  # 30 second timeout
+                    
+            except RuntimeError:
+                # No event loop running, safe to create one
+                logger.info("No running event loop detected, creating new loop for MCP initialization")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(
+                        SimplifiedMCPIntegration.add_mcp_tools_to_kernel(kernel, mcp_servers)
+                    )
+                finally:
+                    loop.close()
+            
+            logger.info(f"Successfully loaded simplified MCP integration (Microsoft-style) for {len(mcp_servers)} servers")
+            
+        except Exception as e:
+            logger.error(f"Failed to load simplified MCP plugins: {e}")
+            import traceback
+            logger.debug(f"MCP integration error details: {traceback.format_exc()}")
+            
         return kernel
